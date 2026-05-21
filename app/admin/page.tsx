@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { Store, LogOut, Plus, Trash2, LayoutDashboard, Package } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -10,9 +11,10 @@ interface Product {
   price: number;
   image_url: string;
   description: string;
+  category: string;
 }
 
-interface Store {
+interface StoreData {
   id: string;
   name: string;
   slug: string;
@@ -23,17 +25,17 @@ export default function AdminPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [store, setStore] = useState<Store | null>(null);
+  const [store, setStore] = useState<StoreData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     description: '',
+    category: 'Geral',
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
 
-  // Configuración de Cloudinary
   const CLOUD_NAME = 'dvfar3pjn';
   const UPLOAD_PRESET = 'luanda-shop';
 
@@ -48,16 +50,8 @@ export default function AdminPage() {
       return;
     }
 
-    const { data: storeData, error: storeError } = await supabase
-      .from('stores')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .single();
-
-    if (storeError || !storeData) {
-      router.push('/register');
-      return;
-    }
+    const { data: storeData } = await supabase.from('stores').select('*').eq('user_id', session.user.id).single();
+    if (!storeData) { router.push('/register'); return; }
 
     setStore(storeData);
     fetchProducts(storeData.id);
@@ -65,15 +59,8 @@ export default function AdminPage() {
   };
 
   const fetchProducts = async (storeId: string) => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setProducts(data);
-    }
+    const { data } = await supabase.from('products').select('*').eq('store_id', storeId).order('created_at', { ascending: false });
+    if (data) setProducts(data);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,9 +68,7 @@ export default function AdminPage() {
     if (file) {
       setImageFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
+      reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -101,13 +86,9 @@ export default function AdminPage() {
           const scaleSize = MAX_WIDTH / img.width;
           canvas.width = MAX_WIDTH;
           canvas.height = img.height * scaleSize;
-          
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          
-          canvas.toBlob((blob) => {
-            resolve(blob!);
-          }, 'image/jpeg', 0.8);
+          canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8);
         };
       };
     });
@@ -116,26 +97,15 @@ export default function AdminPage() {
   const uploadImage = async (file: File): Promise<string | null> => {
     setUploading(true);
     try {
-      // 1. Comprimir imagen
       const compressedBlob = await compressImage(file);
       const formDataCloud = new FormData();
       formDataCloud.append('file', compressedBlob);
       formDataCloud.append('upload_preset', UPLOAD_PRESET);
 
-      // 2. Subir a Cloudinary
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        {
-          method: 'POST',
-          body: formDataCloud,
-        }
-      );
-
-      if (!response.ok) throw new Error('Erro no upload para Cloudinary');
-
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: formDataCloud });
+      if (!response.ok) throw new Error('Erro no upload');
       const data = await response.json();
-      return data.secure_url; // URL segura (HTTPS) de la imagen optimizada
-
+      return data.secure_url;
     } catch (err: any) {
       alert('Erro ao enviar imagem: ' + err.message);
       return null;
@@ -149,7 +119,6 @@ export default function AdminPage() {
     if (!store || !formData.name || !formData.price) return;
 
     let imageUrl = 'https://placehold.co/400x400?text=Sem+Foto';
-
     if (imageFile) {
       const uploadedUrl = await uploadImage(imageFile);
       if (uploadedUrl) imageUrl = uploadedUrl;
@@ -162,10 +131,11 @@ export default function AdminPage() {
       price: Number(formData.price),
       image_url: imageUrl,
       description: formData.description,
+      category: formData.category,
     });
 
     if (!error) {
-      setFormData({ name: '', price: '', description: '' });
+      setFormData({ name: '', price: '', description: '', category: 'Geral' });
       setImageFile(null);
       setImagePreview('');
       fetchProducts(store.id);
@@ -176,10 +146,8 @@ export default function AdminPage() {
 
   const handleDeleteProduct = async (id: string) => {
     if (!store) return;
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (!error) {
-      fetchProducts(store.id);
-    }
+    await supabase.from('products').delete().eq('id', id);
+    fetchProducts(store.id);
   };
 
   const handleLogout = async () => {
@@ -193,16 +161,21 @@ export default function AdminPage() {
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{store?.name}</h1>
-            <p className="text-xs text-gray-500">Painel de Administração</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <Store className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">{store?.name}</h1>
+              <p className="text-xs text-gray-500">Painel de Administração</p>
+            </div>
           </div>
-          <div className="flex gap-4 items-center">
-            <a href={`/s/${store?.slug}`} target="_blank" className="text-sm text-green-600 hover:underline font-medium">
-              Ver Loja Pública ↗
+          <div className="flex gap-3 items-center">
+            <a href={`/s/${store?.slug}`} target="_blank" className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium bg-green-50 px-3 py-1.5 rounded-lg transition">
+              <LayoutDashboard className="w-4 h-4" /> Ver Loja
             </a>
-            <button onClick={handleLogout} className="text-sm text-red-500 hover:text-red-700 font-medium">
-              Sair
+            <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 font-medium bg-red-50 px-3 py-1.5 rounded-lg transition">
+              <LogOut className="w-4 h-4" /> Sair
             </button>
           </div>
         </div>
@@ -212,46 +185,53 @@ export default function AdminPage() {
         
         {/* Formulario */}
         <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-xl shadow-md sticky top-24">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Adicionar Produto</h2>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 sticky top-24">
+            <h2 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-blue-600" /> Novo Produto
+            </h2>
             <form onSubmit={handleAddProduct} className="space-y-4">
               
-              {/* Input de Imagen */}
+              {/* Imagen */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Imagem do Produto</label>
-                <div className="flex items-center gap-4">
-                  <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg border border-gray-300 transition flex-grow text-center">
-                    {imageFile ? imageFile.name : 'Escolher Arquivo'}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagem</label>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 text-gray-600 px-4 py-3 rounded-lg transition flex-grow text-center text-sm">
+                    {imageFile ? imageFile.name : '📁 Escolher Arquivo'}
                     <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                   </label>
-                  {imagePreview && (
-                    <img src={imagePreview} alt="Preview" className="w-12 h-12 object-cover rounded-md border" />
-                  )}
+                  {imagePreview && <img src={imagePreview} alt="Preview" className="w-12 h-12 object-cover rounded-lg border" />}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input
-                  type="text"
-                  required
-                  value={formData.name}
+                  type="text" required value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-gray-50"
                   placeholder="Ex: Ténis Nike Air"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Preço (Kz)</label>
-                <input
-                  type="number"
-                  required
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900"
-                  placeholder="Ex: 15000"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Preço (Kz)</label>
+                  <input
+                    type="number" required value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-gray-50"
+                    placeholder="15000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                  <input
+                    type="text" value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-gray-50"
+                    placeholder="Ex: Roupas"
+                  />
+                </div>
               </div>
 
               <div>
@@ -259,52 +239,53 @@ export default function AdminPage() {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900"
-                  rows={3}
-                  placeholder="Breve descrição..."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 bg-gray-50"
+                  rows={2} placeholder="Breve descrição..."
                 />
               </div>
 
               <button
-                type="submit"
-                disabled={uploading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition disabled:opacity-50"
+                type="submit" disabled={uploading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition disabled:opacity-50 shadow-lg shadow-blue-600/20"
               >
-                {uploading ? 'Enviando para Cloudinary...' : 'Adicionar Produto'}
+                {uploading ? 'Enviando...' : 'Adicionar Produto'}
               </button>
             </form>
           </div>
         </div>
 
-        {/* Lista de Productos */}
+        {/* Lista */}
         <div className="lg:col-span-2">
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Seus Produtos ({products.length})</h2>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Package className="w-5 h-5 text-blue-600" /> Seus Produtos
+              </h2>
+              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">{products.length}</span>
+            </div>
             
             {products.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                Nenhum produto cadastrado ainda.
+              <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Nenhum produto cadastrado ainda.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {products.map((product) => (
-                  <div key={product.id} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-                    <img 
-                      src={product.image_url} 
-                      alt={product.name} 
-                      className="w-16 h-16 object-cover rounded-md bg-gray-200"
-                    />
-                    <div className="flex-grow">
-                      <h3 className="font-medium text-gray-900">{product.name}</h3>
-                      <p className="text-sm text-gray-500">{product.price.toLocaleString('pt-AO')} Kz</p>
+                  <div key={product.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:shadow-md transition bg-white group">
+                    <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-lg bg-gray-100" />
+                    <div className="flex-grow min-w-0">
+                      <h3 className="font-bold text-gray-900 truncate">{product.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-blue-600 font-bold text-sm">{product.price.toLocaleString('pt-AO')} Kz</span>
+                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{product.category}</span>
+                      </div>
                     </div>
                     <button
                       onClick={() => handleDeleteProduct(product.id)}
-                      className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-full transition"
+                      className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
                 ))}
