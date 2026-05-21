@@ -196,10 +196,10 @@ export default function PublicStorePage() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
           <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in">
             <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5" /> Seu Carrinho
               </h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
+              <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -215,15 +215,15 @@ export default function PublicStorePage() {
                   <div key={item.id} className="flex gap-3 bg-gray-50 p-3 rounded-xl">
                     <img src={item.image_url} alt={item.name} className="w-16 h-16 object-cover rounded-lg" />
                     <div className="flex-1">
-                      <h4 className="font-medium text-sm line-clamp-1">{item.name}</h4>
+                      <h4 className="font-bold text-gray-900 text-sm line-clamp-1">{item.name}</h4>
                       <p className="text-blue-600 font-bold text-sm">{item.price.toLocaleString('pt-AO')} Kz</p>
                       
                       <div className="flex items-center gap-3 mt-2">
-                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 bg-white rounded shadow hover:bg-gray-100">
+                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 bg-white text-gray-900 rounded shadow hover:bg-gray-100">
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="text-sm font-medium w-4 text-center">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 bg-white rounded shadow hover:bg-gray-100">
+                        <span className="text-sm font-bold text-gray-900 w-4 text-center">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 bg-white text-gray-900 rounded shadow hover:bg-gray-100">
                           <Plus className="w-3 h-3" />
                         </button>
                         <button onClick={() => removeItem(item.id)} className="ml-auto text-red-500 p-1 hover:bg-red-50 rounded">
@@ -238,7 +238,7 @@ export default function PublicStorePage() {
 
             {items.length > 0 && (
               <div className="p-4 border-t bg-white space-y-3">
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between text-lg font-bold text-gray-900">
                   <span>Total</span>
                   <span>{total.toLocaleString('pt-AO')} Kz</span>
                 </div>
