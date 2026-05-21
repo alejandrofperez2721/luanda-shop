@@ -114,7 +114,7 @@ export default function PublicStorePage() {
               placeholder="Pesquisar produtos..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+              className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-gray-900"
             />
           </div>
           
@@ -163,12 +163,26 @@ export default function PublicStorePage() {
                     {product.price.toLocaleString('pt-AO')} Kz
                   </p>
                   
-                  <button
-                    onClick={() => addItem(product)}
-                    className="w-full bg-gray-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" /> Adicionar
-                  </button>
+                  <div className="flex items-center gap-2 mt-2">
+                    <input 
+                      type="number" 
+                      defaultValue={1} 
+                      min={1}
+                      id={`qty-${product.id}`}
+                      className="w-14 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => {
+                        const qtyInput = document.getElementById(`qty-${product.id}`) as HTMLInputElement;
+                        const qty = parseInt(qtyInput.value) || 1;
+                        for(let i=0; i<qty; i++) addItem(product);
+                        qtyInput.value = '1';
+                      }}
+                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-blue-600/20"
+                    >
+                      <ShoppingCart className="w-4 h-4" /> Adicionar
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
